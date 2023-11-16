@@ -26,6 +26,62 @@ def convert_and_format_timestamp(df):
     return df
 
 
+def trim_timeseries(df, ref_col):
+    """
+    Trims a time series DataFrame based on the values in the reference column.
+
+    Parameters:
+        df (pandas.DataFrame): The input DataFrame containing time series data.
+        ref_col (str): The name of the column that serves as the reference for trimming.
+
+    Returns:
+        pandas.DataFrame: A new DataFrame containing the trimmed time series data.
+    """
+    ############## Trimming ###############
+
+    # Find the earliest and latest timestamps in the reference column
+    min_timestamp = df[ref_col].min()
+    max_timestamp = df[ref_col].max()
+
+    # Compiling the remaining time columns into a list
+    time_col = [col for col in df.columns if col.startswith(('tms_'))]
+
+    # Trim other columns based on the values from the reference column
+    trimmed_df = []
+    trimmed_column_names = []  # List to store the column names for the trimmed DataFrame
+
+    for col in time_col:
+        # Get the index of the current column 'col'
+        col_index = df.columns.get_loc(col)
+
+        # Get the indices of the four columns (time column and x, y, and z columns)
+        selected_indices = list(range(col_index, col_index + 4))
+
+        # Apply the mask to the selected columns
+        mask = (df[col] >= min_timestamp) & (df[col] <= max_timestamp)
+        trimmed_cols = df.loc[mask, df.columns[selected_indices]].reset_index(drop=True)
+
+        # Append the column names to the list
+        trimmed_column_names.extend(df.columns[selected_indices])
+
+        trimmed_df.append(trimmed_cols)
+
+    last_3_cols = df.iloc[:, -3:]
+    first_ref_index = df[ref_col].index[0]
+    last_ref_index = df[ref_col].index[-1]
+    last_3_cols_trimmed = last_3_cols.iloc[first_ref_index:last_ref_index + 1].reset_index(drop=True)
+
+    # Append the column names for the last 4 columns
+    trimmed_column_names.extend(last_3_cols.columns)
+
+    trimmed_df.append(last_3_cols_trimmed)
+
+    # Concatenate the DataFrames along the columns with the appropriate column names
+    trimmed_df = pd.concat(trimmed_df, axis=1)
+
+    return trimmed_df
+
+
 def calculate_deltas(df):
     """
     Calculate time deltas between consecutive values of datetime-like columns in the DataFrame.
